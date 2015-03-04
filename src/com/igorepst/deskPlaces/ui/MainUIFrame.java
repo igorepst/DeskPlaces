@@ -10,13 +10,13 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Point;
-import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -37,7 +37,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
-import com.igorepst.deskPlaces.shortcutConvertors.UnixConvertor;
+import com.igorepst.deskPlaces.util.Util;
 
 //TODO memory leak on screen switching???
 public class MainUIFrame extends JDialog {
@@ -98,11 +98,11 @@ public class MainUIFrame extends JDialog {
 		// setLocation(1921, 0);
 		showOnScreen(false);
 		setVisible(true);
-		
+
 		addKeyBindings(table);
 		setCursor(new Cursor(Cursor.HAND_CURSOR));
 	}
-	
+
 	private void addKeyBindings(JComponent comp) {
 		Action moveToScrAction = new AbstractAction() {
 			@Override
@@ -115,10 +115,12 @@ public class MainUIFrame extends JDialog {
 			comp.getInputMap().put(KeyStroke.getKeyStroke("F" + i), actionStr);
 		}
 		comp.getActionMap().put(actionStr, moveToScrAction);
-		
-		//Debug
+
+		// Debug
 		actionStr = "moveToDef";
-		comp.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, InputEvent.ALT_MASK | InputEvent.SHIFT_MASK), actionStr);
+		comp.getInputMap().put(
+				KeyStroke.getKeyStroke(KeyEvent.VK_F1, InputEvent.ALT_MASK
+						| InputEvent.SHIFT_MASK), actionStr);
 		comp.getActionMap().put(actionStr, new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -145,32 +147,32 @@ public class MainUIFrame extends JDialog {
 		// }
 		GraphicsDevice defaultScreenDevice = ge.getDefaultScreenDevice();
 		for (GraphicsDevice gd : ge.getScreenDevices()) {
-			boolean use = useDefault ? (gd == defaultScreenDevice):(gd != defaultScreenDevice);
+			boolean use = useDefault ? (gd == defaultScreenDevice)
+					: (gd != defaultScreenDevice);
 			if (use) {
-				setLocation(gd.getDefaultConfiguration().getBounds().x,
-						getY());
+				setLocation(gd.getDefaultConfiguration().getBounds().x, getY());
 				break;
 			}
 		}
 		toFront();
 	}
 
-	private static void showOnSecondaryScreen(Window window) {
-		GraphicsEnvironment ge = GraphicsEnvironment
-				.getLocalGraphicsEnvironment();
-		GraphicsDevice[] gds = ge.getScreenDevices();
-		if (gds == null || gds.length < 2) {
-			return;
-		}
-		String defDev = ge.getDefaultScreenDevice().getIDstring();
-		for (GraphicsDevice gd : gds) {
-			if (!gd.getIDstring().equals(defDev)) {
-				window.setLocation(gd.getDefaultConfiguration().getBounds().x,
-						window.getY());
-				return;
-			}
-		}
-	}
+	// private static void showOnSecondaryScreen(Window window) {
+	// GraphicsEnvironment ge = GraphicsEnvironment
+	// .getLocalGraphicsEnvironment();
+	// GraphicsDevice[] gds = ge.getScreenDevices();
+	// if (gds == null || gds.length < 2) {
+	// return;
+	// }
+	// String defDev = ge.getDefaultScreenDevice().getIDstring();
+	// for (GraphicsDevice gd : gds) {
+	// if (!gd.getIDstring().equals(defDev)) {
+	// window.setLocation(gd.getDefaultConfiguration().getBounds().x,
+	// window.getY());
+	// return;
+	// }
+	// }
+	// }
 
 	private void updateRowHeights() {
 		try {
@@ -211,25 +213,27 @@ public class MainUIFrame extends JDialog {
 
 	public static void main(String[] args) {
 
-		// long lo = System.currentTimeMillis();
+//		long lo = System.currentTimeMillis();
 		List<DeskCell> dataList = new ArrayList<>();
 		BufferedReader br = null;
 		try {
 			br = new BufferedReader(new InputStreamReader(new FileInputStream(
-					UnixConvertor.outFile), "UTF-8"));
+					Util.outFile), "UTF-8"));
 			String line;
 			String[] splitArr;
 			Pattern splitPattern = Pattern.compile(String
-					.valueOf(UnixConvertor.dataDivider));
+					.valueOf(Util.dataDivider));
 			while ((line = br.readLine()) != null) {
 				splitArr = splitPattern.split(line);
-				if (splitArr.length == 3) {
-					dataList.add(new DeskCell(splitArr[0], splitArr[1],
-							splitArr[2], null));
-				} else if (splitArr.length == 4) {
-					dataList.add(new DeskCell(splitArr[0], splitArr[1],
-							splitArr[2], splitArr[3]));
+				if (splitArr.length < 3) {
+					continue;
 				}
+				File dir = new File(splitArr[2]);
+				if (!dir.isDirectory()) {
+					continue;
+				}
+				dataList.add(new DeskCell(splitArr[0], splitArr[1], dir,
+						splitArr.length == 3 ? null : splitArr[3]));
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -249,9 +253,8 @@ public class MainUIFrame extends JDialog {
 		uiFrame.table.setModel(new MainUITableModel(cells));
 		uiFrame.scrollPane.setColumnHeader(null);
 		uiFrame.updateRowHeights();
-
-		// System.out.println("time to load = "
-		// + (System.currentTimeMillis() - lo));
+//		System.out.println("time to load = "
+//				+ (System.currentTimeMillis() - lo));
 	}
 
 }
