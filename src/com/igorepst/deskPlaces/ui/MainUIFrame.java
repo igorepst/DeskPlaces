@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.swing.AbstractAction;
-import javax.swing.Action;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JPanel;
@@ -37,21 +36,22 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
+import com.igorepst.deskPlaces.util.Settings;
 import com.igorepst.deskPlaces.util.Util;
 
-//TODO memory leak on screen switching???
 public class MainUIFrame extends JDialog {
 
+	private static final String MOVE_TO_DEF_COMMAND = "moveToDef";
+	private static final String MOVE_TO_SCR_COMMAND = "moveToScr";
 	private final JTable table;
 	private JScrollPane scrollPane;
 
 	private MainUIFrame() {
+
 		try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 		} catch (Exception ex) {
 		}
-
-		setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 
 		table = new JTable();
 		table.setFillsViewportHeight(true);
@@ -85,8 +85,14 @@ public class MainUIFrame extends JDialog {
 		scrollPane.getViewport().setOpaque(false);
 		scrollPane.getVerticalScrollBar().setUnitIncrement(35);
 
-		setUndecorated(true);
-		setBackground(new Color(0, 0, 0, 0));
+		if (Settings.isDecorations()) {
+			setTitle(Settings.DESK_PLACES_NAME);
+		} else {
+			setUndecorated(true);
+			setBackground(new Color(0, 0, 0, 0));
+		}
+		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+
 		TranslucentPane translucentPane = new TranslucentPane();
 		translucentPane.setLayout(new BorderLayout());
 		setContentPane(translucentPane);
@@ -96,7 +102,7 @@ public class MainUIFrame extends JDialog {
 		// setLocation(0, 0);
 		setSize(1920, 1080);
 		// setLocation(1921, 0);
-		showOnScreen(false);
+		showOnScreen(Settings.getDisplay());
 		setVisible(true);
 
 		addKeyBindings(table);
@@ -104,75 +110,49 @@ public class MainUIFrame extends JDialog {
 	}
 
 	private void addKeyBindings(JComponent comp) {
-		Action moveToScrAction = new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				showOnScreen(false);
-			}
-		};
-		String actionStr = "moveToScr";
 		for (int i = 24; --i >= 1;) {
-			comp.getInputMap().put(KeyStroke.getKeyStroke("F" + i), actionStr);
+			comp.getInputMap().put(KeyStroke.getKeyStroke("F" + i),
+					MainUIFrame.MOVE_TO_SCR_COMMAND);
 		}
-		comp.getActionMap().put(actionStr, moveToScrAction);
+		comp.getActionMap().put(MainUIFrame.MOVE_TO_SCR_COMMAND,
+				new AbstractAction() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						showOnScreen(Settings.getDisplay());
+					}
+				});
 
 		// Debug
-		actionStr = "moveToDef";
 		comp.getInputMap().put(
 				KeyStroke.getKeyStroke(KeyEvent.VK_F1, InputEvent.ALT_MASK
-						| InputEvent.SHIFT_MASK), actionStr);
-		comp.getActionMap().put(actionStr, new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				showOnScreen(true);
-			}
-		});
+						| InputEvent.SHIFT_MASK),
+				MainUIFrame.MOVE_TO_DEF_COMMAND);
+		comp.getActionMap().put(MainUIFrame.MOVE_TO_DEF_COMMAND,
+				new AbstractAction() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						showOnScreen(Settings.DEFAULT_DISPLAY);
+					}
+				});
 	}
 
-	private void showOnScreen(final boolean useDefault) {
+	private void showOnScreen(int display) {
 		GraphicsEnvironment ge = GraphicsEnvironment
 				.getLocalGraphicsEnvironment();
-		// GraphicsDevice[] gd = ge.getScreenDevices();
-		// if (screen > -1 && screen < gd.length) {
-		// window.setLocation(
-		// gd[screen].getDefaultConfiguration().getBounds().x,
-		// window.getY());
-		// window.setLocation(ge.getDefaultScreenDevice()
-		// .getDefaultConfiguration().getBounds().x, window.getY());
-		// } else if (gd.length > 0) {
-		// window.setLocation(gd[0].getDefaultConfiguration().getBounds().x,
-		// window.getY());
-		// } else {
-		// throw new RuntimeException("No Screens Found");
-		// }
-		GraphicsDevice defaultScreenDevice = ge.getDefaultScreenDevice();
-		for (GraphicsDevice gd : ge.getScreenDevices()) {
-			boolean use = useDefault ? (gd == defaultScreenDevice)
-					: (gd != defaultScreenDevice);
-			if (use) {
-				setLocation(gd.getDefaultConfiguration().getBounds().x, getY());
-				break;
+		GraphicsDevice device = null;
+		if (display > Settings.DEFAULT_DISPLAY) {
+			GraphicsDevice[] gds = ge.getScreenDevices();
+			display -= 1;
+			if (gds.length > display) {
+				device = gds[display];
 			}
 		}
+		if (device == null) {
+			device = ge.getDefaultScreenDevice();
+		}
+		setLocation(device.getDefaultConfiguration().getBounds().x, getY());
 		toFront();
 	}
-
-	// private static void showOnSecondaryScreen(Window window) {
-	// GraphicsEnvironment ge = GraphicsEnvironment
-	// .getLocalGraphicsEnvironment();
-	// GraphicsDevice[] gds = ge.getScreenDevices();
-	// if (gds == null || gds.length < 2) {
-	// return;
-	// }
-	// String defDev = ge.getDefaultScreenDevice().getIDstring();
-	// for (GraphicsDevice gd : gds) {
-	// if (!gd.getIDstring().equals(defDev)) {
-	// window.setLocation(gd.getDefaultConfiguration().getBounds().x,
-	// window.getY());
-	// return;
-	// }
-	// }
-	// }
 
 	private void updateRowHeights() {
 		try {
@@ -212,17 +192,23 @@ public class MainUIFrame extends JDialog {
 	}
 
 	public static void main(String[] args) {
+		String cfgName = "settings.cfg";
+		if (args.length > 0) {
+			String arg = args[0];
+			if (arg != null && !arg.isEmpty()) {
+				cfgName = arg;
+			}
+		}
+		Settings.read(cfgName);
 
-//		long lo = System.currentTimeMillis();
 		List<DeskCell> dataList = new ArrayList<>();
 		BufferedReader br = null;
 		try {
 			br = new BufferedReader(new InputStreamReader(new FileInputStream(
-					Util.outFile), "UTF-8"));
+					Settings.getDefFile()), "UTF-8"));
 			String line;
 			String[] splitArr;
-			Pattern splitPattern = Pattern.compile(String
-					.valueOf(Util.dataDivider));
+			Pattern splitPattern = Pattern.compile(Util.dataDivider);
 			while ((line = br.readLine()) != null) {
 				splitArr = splitPattern.split(line);
 				if (splitArr.length < 3) {
@@ -253,8 +239,6 @@ public class MainUIFrame extends JDialog {
 		uiFrame.table.setModel(new MainUITableModel(cells));
 		uiFrame.scrollPane.setColumnHeader(null);
 		uiFrame.updateRowHeights();
-//		System.out.println("time to load = "
-//				+ (System.currentTimeMillis() - lo));
 	}
 
 }

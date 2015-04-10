@@ -16,13 +16,16 @@ import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 
 import com.igorepst.deskPlaces.util.ImgFile;
+import com.igorepst.deskPlaces.util.Settings;
 import com.igorepst.deskPlaces.util.Util;
 
 public class DeskCell implements Comparable<DeskCell> {
-
-	private static final int IMAGE_DIM = 220;
-	private static final File IMAGE_DIR_THUMBS = new File(Util.IMAGE_DIR,
-			".thumbs-" + DeskCell.IMAGE_DIM);
+	private static final File IMAGE_DIR = new File(Settings.getImageDir());
+	public static final File DESK_HOME_DIR = new File(
+			System.getProperty("user.home"), "." + Settings.DESK_PLACES_NAME);
+	public static final File IMAGE_DIR_THUMBS = new File(
+			DeskCell.DESK_HOME_DIR, Settings.THUMBS_DIR_PREFIX
+					+ Settings.getImageDim());
 	private static List<ImgFile> thumbs, images;
 
 	static {
@@ -32,10 +35,13 @@ public class DeskCell implements Comparable<DeskCell> {
 			DeskCell.IMAGE_DIR_THUMBS.mkdirs();
 			DeskCell.thumbs = new ArrayList<ImgFile>(0);
 		}
+		try {
+			Util.deleteOldThumbs();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
-	// private static final String VLC_COMM =
-	// "D:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe";
 	protected final String name;
 	private final File dir;
 	private final String param;
@@ -54,15 +60,16 @@ public class DeskCell implements Comparable<DeskCell> {
 			try {
 				if (thumbsFile == null) {
 					if (DeskCell.images == null) {
-						DeskCell.images = Util.getImgFiles(Util.IMAGE_DIR);
+						DeskCell.images = Util.getImgFiles(DeskCell.IMAGE_DIR);
 					}
 					File fullImageFile = resolveIcon(imgFile, DeskCell.images);
 					if (fullImageFile != null) {
 						thumbsFile = new File(DeskCell.IMAGE_DIR_THUMBS,
 								fullImageFile.getName());
 						img = ImageIO.read(fullImageFile);
-						if (img.getWidth() == DeskCell.IMAGE_DIM
-								&& img.getHeight() == DeskCell.IMAGE_DIM) {
+						final int IMAGE_DIM = Settings.getImageDim();
+						if (img.getWidth() == IMAGE_DIM
+								&& img.getHeight() == IMAGE_DIM) {
 							Files.copy(
 									fullImageFile.toPath(),
 									thumbsFile.toPath(),
@@ -92,19 +99,11 @@ public class DeskCell implements Comparable<DeskCell> {
 	}
 
 	protected void runCmd() {
-		// ProcessBuilder pb = new ProcessBuilder(DeskCell.VLC_COMM,
-		// "--no-qt-recentplay", "--fullscreen", "--loop",
-		// "--playlist-tree", "--playlist-autostart",
-		// param == null ? "--no-random" : param, playlistFile);
-		// long lo = System.currentTimeMillis();
 		String plName = Util.getPlaylist(dir, param != null);
-		// System.out.println("time="+(System.currentTimeMillis()-lo));
 		if (plName == null || plName.isEmpty()) {
 			return;
 		}
-		ProcessBuilder pb = new ProcessBuilder(
-				"D:\\Program Files\\MPC-HC\\mpc-hc64.exe", plName, "/play",
-				"/fullscreen", "/monitor", "2");
+		ProcessBuilder pb = new ProcessBuilder(Settings.getRunByCmd(plName));
 		try {
 			pb.start();
 		} catch (IOException ex) {
@@ -118,12 +117,13 @@ public class DeskCell implements Comparable<DeskCell> {
 	}
 
 	private BufferedImage getScaledImage(Image srcImg) {
-		BufferedImage resizedImg = new BufferedImage(DeskCell.IMAGE_DIM,
-				DeskCell.IMAGE_DIM, Transparency.TRANSLUCENT);
+		final int IMAGE_DIM = Settings.getImageDim();
+		BufferedImage resizedImg = new BufferedImage(IMAGE_DIM, IMAGE_DIM,
+				Transparency.TRANSLUCENT);
 		Graphics2D g2 = resizedImg.createGraphics();
 		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
 				RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-		g2.drawImage(srcImg, 0, 0, DeskCell.IMAGE_DIM, DeskCell.IMAGE_DIM, null);
+		g2.drawImage(srcImg, 0, 0, IMAGE_DIM, IMAGE_DIM, null);
 		g2.dispose();
 		return resizedImg;
 	}

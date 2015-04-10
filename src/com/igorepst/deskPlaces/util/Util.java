@@ -4,6 +4,11 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -12,12 +17,11 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.igorepst.deskPlaces.ui.DeskCell;
+
 public class Util {
 
 	private static final String PLAYLIST_NAME = "deskPlacesPlaylist.m3u";
-	private static final String CONF_DIR = "D:\\My Documents\\multPlaces\\";
-	public static final File IMAGE_DIR = new File(Util.CONF_DIR, "icons");
-	public static final String outFile = Util.CONF_DIR + "multPlace.cfg";
 	public static final String dataDivider = "\\|";
 
 	private static final String[] MEDIA_EXTS = { "mkv", "avi", "mp4", "mpg",
@@ -51,7 +55,7 @@ public class Util {
 
 	private static final TreeSet<String> mediaSet = new TreeSet<>();
 	private static final TreeSet<String> imgSet = new TreeSet<>();
-	
+
 	private static int currentIndex;
 
 	static {
@@ -79,13 +83,15 @@ public class Util {
 		}
 		return POSSIBLE_IMAGES.PNG.name();
 	}
-	
+
 	private static boolean accept(String name, Set<String> set) {
 		Util.currentIndex = name.lastIndexOf('.');
-		if (Util.currentIndex == -1 || Util.currentIndex == 0 || Util.currentIndex == name.length() - 1) {
+		if (Util.currentIndex == -1 || Util.currentIndex == 0
+				|| Util.currentIndex == name.length() - 1) {
 			return false;
 		}
-		String ext = name.substring(Util.currentIndex + 1).toLowerCase(Locale.ENGLISH);
+		String ext = name.substring(Util.currentIndex + 1).toLowerCase(
+				Locale.ENGLISH);
 		return set.contains(ext);
 	}
 
@@ -169,67 +175,44 @@ public class Util {
 		return list;
 	}
 
-//	public static void main(String[] args) {
-//		BufferedReader br = null;
-//		PrintWriter out = null;
-//		String dn = "d:\\My Documents\\multPlaces\\multPlace.cfg";
-//		try {
-//			br = new BufferedReader(new FileReader(dn));
-//			out = new PrintWriter(dn + ".new", "UTF-8");
-//			String line;
-//			String[] splitArr;
-//			Pattern splitPattern = Pattern.compile(String
-//					.valueOf(";"));
-//			while ((line = br.readLine()) != null) {
-//				splitArr = splitPattern.split(line);
-//				if(splitArr.length<3){
-//				}
-//				else{
-//					StringBuilder bld = new StringBuilder(splitArr[0]).append('|');
-//					line = splitArr[1];
-//					int ind = line.lastIndexOf('.');
-//					bld.append(line.substring(0, ind)).append('|');
-//					bld.append(Util.parseDirFromPlaylist(new File("d:\\My Documents\\multPlaces\\playlists", splitArr[2])));
-//					if(splitArr.length==4){
-//						bld.append("|random");
-//					}
-//					out.println(bld.toString());
-//				}
-//			}
-//		} catch (IOException e) {
-//		} finally {
-//			if (br != null) {
-//				try {
-//					br.close();
-//				} catch (IOException e) {
-//				}
-//			}
-//			if(out!=null){
-//				out.close();
-//			}
-//		}
-//	}
-//	
-//	private static String parseDirFromPlaylist(File file) {
-//		BufferedReader br = null;
-//		try {
-//			br = new BufferedReader(new FileReader(file));
-//			String line;
-//			while ((line = br.readLine()) != null) {
-//				if (line.startsWith("directory:///")) {
-//					return line.substring("directory:///".length());
-//				}
-//			}
-//		} catch (IOException e) {
-//		} finally {
-//			if (br != null) {
-//				try {
-//					br.close();
-//				} catch (IOException e) {
-//				}
-//			}
-//		}
-//		return null;
-//	}
+	public static void deleteOldThumbs() throws IOException {
+		final Path start = DeskCell.DESK_HOME_DIR.toPath();
+		Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
+			@Override
+			public FileVisitResult visitFile(Path file,
+					BasicFileAttributes attrs) throws IOException {
+				Files.delete(file);
+				return FileVisitResult.CONTINUE;
+			}
 
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException e)
+					throws IOException {
+				if (e == null) {
+					if (!dir.equals(start)) {
+						Files.delete(dir);
+					}
+					return FileVisitResult.CONTINUE;
+				} else {
+					// directory iteration failed
+					throw e;
+				}
+			}
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir,
+					BasicFileAttributes attrs) throws IOException {
+				if (dir.equals(start)) {
+					return FileVisitResult.CONTINUE;
+				}
+				if (dir.equals(DeskCell.IMAGE_DIR_THUMBS.toPath())) {
+					return FileVisitResult.SKIP_SUBTREE;
+				}
+				return dir.toFile().getName()
+						.startsWith(Settings.THUMBS_DIR_PREFIX) ? FileVisitResult.CONTINUE
+						: FileVisitResult.SKIP_SUBTREE;
+			}
+		});
+
+	}
 }
