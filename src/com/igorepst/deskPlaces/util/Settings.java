@@ -1,5 +1,6 @@
 package com.igorepst.deskPlaces.util;
 
+import java.awt.Font;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -17,10 +18,11 @@ public class Settings {
 
 	private static final String DISPLAY_SETTING_NAME = "display";
 	private static final String DECORATIONS_SETTING_NAME = "decorations";
-	private static final String RUNBY_SETTING_NAME = "runBy";
+	public static final String RUNBY_SETTING_NAME = "runBy";
 	private static final String IMAGE_DIM_SETTING_NAME = "iconSize";
 	private static final String IMAGE_DIR_SETTING_NAME = "iconsDir";
 	private static final String DEF_FILE_SETTING_NAME = "definitionsFile";
+	private static final String FONT_SETTING_NAME = "font";
 	private static final String PLAYLIST = "$PLAYLIST$";
 
 	public static final int DEFAULT_DISPLAY = 0;
@@ -32,6 +34,7 @@ public class Settings {
 	private static String imageDir = "";
 	private static String defFile = "";
 	private static List<String> commands = new ArrayList<String>();
+	private static Font labelFont;
 
 	private Settings() {
 	}
@@ -77,17 +80,19 @@ public class Settings {
 					Settings.decorations = Boolean.parseBoolean(value);
 					break;
 				case RUNBY_SETTING_NAME:
-					ind = value.indexOf(Settings.PLAYLIST);
-					if (ind == -1) {
-						Settings.parseRunBy(value);
-						Settings.playlistPlace = Settings.commands.size();
-						Settings.commands.add(null);
-					} else {
-						Settings.parseRunBy(value.substring(0, ind));
-						Settings.playlistPlace = Settings.commands.size();
-						Settings.commands.add(null);
-						Settings.parseRunBy(value.substring(ind
-								+ Settings.PLAYLIST.length()));
+					if (!value.isEmpty()) {
+						ind = value.indexOf(Settings.PLAYLIST);
+						if (ind == -1) {
+							Settings.parseRunBy(value);
+							Settings.playlistPlace = Settings.commands.size();
+							Settings.commands.add(null);
+						} else {
+							Settings.parseRunBy(value.substring(0, ind));
+							Settings.playlistPlace = Settings.commands.size();
+							Settings.commands.add(null);
+							Settings.parseRunBy(value.substring(ind
+									+ Settings.PLAYLIST.length()));
+						}
 					}
 					break;
 				case IMAGE_DIM_SETTING_NAME:
@@ -105,6 +110,9 @@ public class Settings {
 					break;
 				case DEF_FILE_SETTING_NAME:
 					Settings.defFile = value;
+					break;
+				case FONT_SETTING_NAME:
+					Settings.labelFont = Font.decode(value);
 					break;
 				}
 			}
@@ -163,12 +171,15 @@ public class Settings {
 	}
 
 	public static List<String> getRunByCmd(final String playlistPath) {
-		if (Settings.commands.size() == 0) {
-			Settings.commands.add(playlistPath);
-		} else {
-			Settings.commands.set(Settings.playlistPlace, playlistPath);
+		if (Settings.commands.isEmpty()) {
+			return null;
 		}
+		Settings.commands.set(Settings.playlistPlace, playlistPath);
 		return new ArrayList<>(Settings.commands);
+	}
+	
+	public static boolean isRunCommandDefined(){
+		return !Settings.commands.isEmpty();
 	}
 
 	public static int getImageDim() {
@@ -181,6 +192,10 @@ public class Settings {
 
 	public static String getDefFile() {
 		return Settings.defFile;
+	}
+
+	public static Font getLabelFont() {
+		return Settings.labelFont;
 	}
 
 }

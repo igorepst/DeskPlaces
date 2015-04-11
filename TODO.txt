@@ -1,6 +1,12 @@
-1. changes to icons dir are not reflected
-2. memory leak on screen switching???
-3. configure font
-4. add custom decor + fix transparency when decorated
-5. add mouse tracking
-6. add search
+* changes to icons dir are not reflected
+* memory leak on screen switching???
+* fix custom decor LAF + provide icons
+* add search by name + icon name
+* add run files to git + support Linux
+* rewrite file readers
+* use cache dir on Linux
+* fork naturalOrderComparator and use as submodule
+* write README
+* supply different config for dev
+* ant / gradle ?
+* file / func comments

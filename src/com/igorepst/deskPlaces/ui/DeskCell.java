@@ -1,9 +1,5 @@
 package com.igorepst.deskPlaces.ui;
 
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.RenderingHints;
-import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +43,8 @@ public class DeskCell implements Comparable<DeskCell> {
 	private final String param;
 	protected final ImageIcon icon;
 
+	protected int column, row;
+
 	protected DeskCell(final String name, final String icon, final File dir,
 			final String param) {
 		this.name = name;
@@ -77,7 +75,7 @@ public class DeskCell implements Comparable<DeskCell> {
 									java.nio.file.StandardCopyOption.COPY_ATTRIBUTES,
 									java.nio.file.LinkOption.NOFOLLOW_LINKS);
 						} else {
-							img = getScaledImage(img);
+							img = Util.getScaledImage(img, Settings.getImageDim());
 							ImageIO.write(img, Util.resolveImageFormat(icon),
 									thumbsFile);
 						}
@@ -99,11 +97,21 @@ public class DeskCell implements Comparable<DeskCell> {
 	}
 
 	protected void runCmd() {
-		String plName = Util.getPlaylist(dir, param != null);
-		if (plName == null || plName.isEmpty()) {
+		if (!Settings.isRunCommandDefined()) {
+			System.err.println(Settings.RUNBY_SETTING_NAME + " is not defined for " + this);
 			return;
 		}
-		ProcessBuilder pb = new ProcessBuilder(Settings.getRunByCmd(plName));
+		String plName = Util.getPlaylist(dir, param != null);
+		if (plName == null || plName.isEmpty()) {
+			System.err.println("Cannot build playlist for " + this);
+			return;
+		}
+		List<String> commands = Settings.getRunByCmd(plName);
+		if (commands == null) {
+			System.err.println(Settings.RUNBY_SETTING_NAME + " is not defined for " + this);
+			return;
+		}
+		ProcessBuilder pb = new ProcessBuilder(commands);
 		try {
 			pb.start();
 		} catch (IOException ex) {
@@ -116,16 +124,39 @@ public class DeskCell implements Comparable<DeskCell> {
 		return o == null ? 1 : (name == null ? -1 : name.compareTo(o.name));
 	}
 
-	private BufferedImage getScaledImage(Image srcImg) {
-		final int IMAGE_DIM = Settings.getImageDim();
-		BufferedImage resizedImg = new BufferedImage(IMAGE_DIM, IMAGE_DIM,
-				Transparency.TRANSLUCENT);
-		Graphics2D g2 = resizedImg.createGraphics();
-		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-				RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-		g2.drawImage(srcImg, 0, 0, IMAGE_DIM, IMAGE_DIM, null);
-		g2.dispose();
-		return resizedImg;
+	@Override
+	public String toString() {
+		return name;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (obj == null) {
+			return false;
+		}
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+		DeskCell other = (DeskCell) obj;
+		if (name == null) {
+			if (other.name != null) {
+				return false;
+			}
+		} else if (!name.equals(other.name)) {
+			return false;
+		}
+		return true;
 	}
 
 }

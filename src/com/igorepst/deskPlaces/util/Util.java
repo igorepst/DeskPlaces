@@ -1,5 +1,10 @@
 package com.igorepst.deskPlaces.util;
 
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.RenderingHints;
+import java.awt.Transparency;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -214,5 +219,16 @@ public class Util {
 			}
 		});
 
+	}
+
+	public static BufferedImage getScaledImage(Image srcImg, final int IMAGE_DIM) {
+		BufferedImage resizedImg = new BufferedImage(IMAGE_DIM, IMAGE_DIM,
+				Transparency.TRANSLUCENT);
+		Graphics2D g2 = resizedImg.createGraphics();
+		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+				RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g2.drawImage(srcImg, 0, 0, IMAGE_DIM, IMAGE_DIM, null);
+		g2.dispose();
+		return resizedImg;
 	}
 }

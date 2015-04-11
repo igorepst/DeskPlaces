@@ -10,11 +10,13 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Point;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,13 +27,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
-import javax.swing.JComponent;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
@@ -39,15 +47,113 @@ import javax.swing.WindowConstants;
 import com.igorepst.deskPlaces.util.Settings;
 import com.igorepst.deskPlaces.util.Util;
 
-public class MainUIFrame extends JDialog {
+public class MainUIFrame {
+
+	private interface UIInt {
+		void setDeskCells(DeskCell[] cells);
+
+		void setVisible(boolean isVisible);
+	}
+
+	private static class MainUIDialog extends JDialog implements UIInt {
+		private final MainUIFrame mainUIframe;
+
+		private MainUIDialog() {
+			setUndecorated(true);
+			setBackground(new Color(0, 0, 0, 0));
+			setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+			mainUIframe = new MainUIFrame();
+			setContentPane(mainUIframe.buildUI(this));
+		}
+
+		@Override
+		public void setDeskCells(DeskCell[] cells) {
+			mainUIframe.setDeskCells(cells);
+		}
+	}
+
+	private static class MainUIJframe extends JFrame implements UIInt {
+		private final MainUIFrame mainUIframe;
+
+		private static final int ICON_DIM = 18;
+		private static final String MAIN_ICON_NAME = null;
+		private static final String CLOSE_ICON_NAME = null;
+
+		private MainUIJframe() {
+			setTitle(Settings.DESK_PLACES_NAME);
+			BufferedImage mainIcon = null;
+			if (MainUIJframe.MAIN_ICON_NAME != null) {
+				try {
+					mainIcon = ImageIO.read(ClassLoader
+							.getSystemResource(MainUIJframe.MAIN_ICON_NAME));
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				if (mainIcon != null) {
+					setIconImage(mainIcon);
+					mainIcon = Util.getScaledImage(mainIcon,
+							MainUIJframe.ICON_DIM);
+				}
+			}
+			setUndecorated(true);
+			setBackground(new Color(0, 0, 0, 0));
+			setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+			mainUIframe = new MainUIFrame();
+			JPanel mainPanel = mainUIframe.buildUI(this);
+			JPanel titlebar = new JPanel();
+			titlebar.setLayout(new BorderLayout(10, 0));
+			JLabel titleLbl = new JLabel(Settings.DESK_PLACES_NAME,
+					mainIcon == null ? null : new ImageIcon(mainIcon),
+					SwingConstants.LEADING);
+			titleLbl.setFont(titleLbl.getFont().deriveFont(18f));
+			titlebar.add(titleLbl);
+			BufferedImage closeIcon = null;
+			if (MainUIJframe.CLOSE_ICON_NAME != null) {
+				try {
+					closeIcon = ImageIO.read(ClassLoader
+							.getSystemResource(MainUIJframe.CLOSE_ICON_NAME));
+					closeIcon = Util.getScaledImage(closeIcon,
+							MainUIJframe.ICON_DIM);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			JButton closeBtn = new JButton(new AbstractAction(null,
+					closeIcon == null ? null : new ImageIcon(closeIcon)) {
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					dispose();
+				}
+			});
+			titlebar.add(closeBtn, BorderLayout.LINE_END);
+
+			mainPanel.add(titlebar, BorderLayout.NORTH);
+			setContentPane(mainPanel);
+		}
+
+		@Override
+		public void setDeskCells(DeskCell[] cells) {
+			mainUIframe.setDeskCells(cells);
+		}
+	}
 
 	private static final String MOVE_TO_DEF_COMMAND = "moveToDef";
 	private static final String MOVE_TO_SCR_COMMAND = "moveToScr";
-	private final JTable table;
+	private static final String RUN_CMD_COMMAND = "runCmd";
+	private JTable table;
 	private JScrollPane scrollPane;
+	private DeskCell lastSelected = null;
 
 	private MainUIFrame() {
+	}
 
+	public void setDeskCells(DeskCell[] cells) {
+		table.setModel(new MainUITableModel(cells));
+		updateRowHeights();
+	}
+
+	private TranslucentPane buildUI(Window window) {
 		try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 		} catch (Exception ex) {
@@ -56,87 +162,141 @@ public class MainUIFrame extends JDialog {
 		table = new JTable();
 		table.setFillsViewportHeight(true);
 		table.setShowGrid(false);
+		table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		table.setDragEnabled(false);
+		table.setCellSelectionEnabled(true);
 		table.setDefaultRenderer(DeskCell.class, new MainUITableCellRenderer());
 		table.setOpaque(false);
+		table.setTableHeader(null);
 
-		table.addMouseListener(new MouseAdapter() {
+		MouseAdapter mad = new MouseAdapter() {
+
 			@Override
 			public void mouseClicked(MouseEvent e) {
 				if (e.getClickCount() == 2
 						&& SwingUtilities.isLeftMouseButton(e)) {
-					Point p = e.getPoint();
-					final int row = table.rowAtPoint(p);
-					if (row > -1) {
-						final int column = table.columnAtPoint(p);
-						if (column > -1) {
-							Object value = table.getModel().getValueAt(row,
-									column);
-							if (value instanceof DeskCell) {
-								((DeskCell) value).runCmd();
-							}
-						}
+					DeskCell dc = getCellAt(e.getPoint());
+					if (dc != null) {
+						dc.runCmd();
 					}
 				}
 			}
-		});
+
+			@Override
+			public void mouseMoved(MouseEvent e) {
+				setSelectedCell(e.getPoint());
+			}
+		};
+
+		table.addMouseListener(mad);
+		table.addMouseMotionListener(mad);
 
 		scrollPane = new JScrollPane(table);
 		scrollPane.setOpaque(false);
+		scrollPane.setColumnHeader(null);
 		scrollPane.getViewport().setOpaque(false);
 		scrollPane.getVerticalScrollBar().setUnitIncrement(35);
 
-		if (Settings.isDecorations()) {
-			setTitle(Settings.DESK_PLACES_NAME);
-		} else {
-			setUndecorated(true);
-			setBackground(new Color(0, 0, 0, 0));
-		}
-		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+		// setLocation(0, 0);
+		window.setSize(1920, 1080);
+		// setLocation(1921, 0);
+		showOnScreen(Settings.getDisplay(), window);
 
+		addKeyBindings(window);
+		window.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+		Point p = table.getMousePosition();
+		if (p != null) {
+			setSelectedCell(p);
+		}
 		TranslucentPane translucentPane = new TranslucentPane();
 		translucentPane.setLayout(new BorderLayout());
-		setContentPane(translucentPane);
 
 		translucentPane.add(scrollPane, BorderLayout.CENTER);
-
-		// setLocation(0, 0);
-		setSize(1920, 1080);
-		// setLocation(1921, 0);
-		showOnScreen(Settings.getDisplay());
-		setVisible(true);
-
-		addKeyBindings(table);
-		setCursor(new Cursor(Cursor.HAND_CURSOR));
+		return translucentPane;
 	}
 
-	private void addKeyBindings(JComponent comp) {
+	private void setSelectedCell(Point p) {
+		DeskCell dc = getCellAt(p);
+		if (lastSelected == null) {
+			if (dc != null) {
+				table.setRowSelectionInterval(dc.row, dc.row);
+				table.setColumnSelectionInterval(dc.column, dc.column);
+				lastSelected = dc;
+			}
+		} else {
+			if (dc == null) {
+				table.clearSelection();
+				lastSelected = null;
+			} else if (!lastSelected.equals(dc)) {
+				table.setRowSelectionInterval(dc.row, dc.row);
+				table.setColumnSelectionInterval(dc.column, dc.column);
+				lastSelected = dc;
+			}
+		}
+	}
+
+	private DeskCell getCellAt(Point p) {
+		final int row = table.rowAtPoint(p);
+		if (row > -1) {
+			final int column = table.columnAtPoint(p);
+			if (column > -1) {
+				Object value = table.getModel().getValueAt(row, column);
+				if (value instanceof DeskCell) {
+					return (DeskCell) value;
+				}
+			}
+		}
+		return null;
+	}
+
+	private void addKeyBindings(final Window window) {
 		for (int i = 24; --i >= 1;) {
-			comp.getInputMap().put(KeyStroke.getKeyStroke("F" + i),
+			table.getInputMap().put(KeyStroke.getKeyStroke("F" + i),
 					MainUIFrame.MOVE_TO_SCR_COMMAND);
 		}
-		comp.getActionMap().put(MainUIFrame.MOVE_TO_SCR_COMMAND,
+		table.getActionMap().put(MainUIFrame.MOVE_TO_SCR_COMMAND,
 				new AbstractAction() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						showOnScreen(Settings.getDisplay());
+						showOnScreen(Settings.getDisplay(), window);
 					}
 				});
 
-		// Debug
-		comp.getInputMap().put(
+		table.getInputMap().put(
 				KeyStroke.getKeyStroke(KeyEvent.VK_F1, InputEvent.ALT_MASK
 						| InputEvent.SHIFT_MASK),
 				MainUIFrame.MOVE_TO_DEF_COMMAND);
-		comp.getActionMap().put(MainUIFrame.MOVE_TO_DEF_COMMAND,
+		table.getActionMap().put(MainUIFrame.MOVE_TO_DEF_COMMAND,
 				new AbstractAction() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
-						showOnScreen(Settings.DEFAULT_DISPLAY);
+						showOnScreen(Settings.DEFAULT_DISPLAY, window);
+					}
+				});
+
+		table.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0),
+				MainUIFrame.RUN_CMD_COMMAND);
+		table.getActionMap().put(MainUIFrame.RUN_CMD_COMMAND,
+				new AbstractAction() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						int col = table.getSelectedColumn();
+						if (col > -1) {
+							int row = table.getSelectedRow();
+							if (row > -1) {
+								Object obj = table.getModel().getValueAt(row,
+										col);
+								if (obj instanceof DeskCell) {
+									((DeskCell) obj).runCmd();
+								}
+							}
+						}
 					}
 				});
 	}
 
-	private void showOnScreen(int display) {
+	private void showOnScreen(int display, final Window window) {
 		GraphicsEnvironment ge = GraphicsEnvironment
 				.getLocalGraphicsEnvironment();
 		GraphicsDevice device = null;
@@ -150,8 +310,9 @@ public class MainUIFrame extends JDialog {
 		if (device == null) {
 			device = ge.getDefaultScreenDevice();
 		}
-		setLocation(device.getDefaultConfiguration().getBounds().x, getY());
-		toFront();
+		window.setLocation(device.getDefaultConfiguration().getBounds().x,
+				window.getY());
+		window.toFront();
 	}
 
 	private void updateRowHeights() {
@@ -233,12 +394,18 @@ public class MainUIFrame extends JDialog {
 			}
 		}
 
-		MainUIFrame uiFrame = new MainUIFrame();
 		DeskCell[] cells = dataList.toArray(new DeskCell[dataList.size()]);
 		Arrays.sort(cells);
-		uiFrame.table.setModel(new MainUITableModel(cells));
-		uiFrame.scrollPane.setColumnHeader(null);
-		uiFrame.updateRowHeights();
+		final UIInt uiFrame = Settings.isDecorations() ? new MainUIJframe()
+				: new MainUIDialog();
+		uiFrame.setDeskCells(cells);
+		SwingUtilities.invokeLater(new Runnable() {
+
+			@Override
+			public void run() {
+				uiFrame.setVisible(true);
+			}
+		});
 	}
 
 }
