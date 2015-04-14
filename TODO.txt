@@ -10,3 +10,5 @@
 * supply different config for dev
 * ant / gradle ?
 * file / func comments
+* substitution doesn't support case sensitive OSs
+* shortcut keys for JFrame ???

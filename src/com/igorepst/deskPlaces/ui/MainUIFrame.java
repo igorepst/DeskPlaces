@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
@@ -136,6 +137,14 @@ public class MainUIFrame {
 		public void setDeskCells(DeskCell[] cells) {
 			mainUIframe.setDeskCells(cells);
 		}
+
+		@Override
+		public void setVisible(boolean b) {
+			super.setVisible(b);
+			if (b) {
+				mainUIframe.table.requestFocusInWindow();
+			}
+		}
 	}
 
 	private static final String MOVE_TO_DEF_COMMAND = "moveToDef";
@@ -197,9 +206,6 @@ public class MainUIFrame {
 		scrollPane.getViewport().setOpaque(false);
 		scrollPane.getVerticalScrollBar().setUnitIncrement(35);
 
-		// setLocation(0, 0);
-		window.setSize(1920, 1080);
-		// setLocation(1921, 0);
 		showOnScreen(Settings.getDisplay(), window);
 
 		addKeyBindings(window);
@@ -310,8 +316,9 @@ public class MainUIFrame {
 		if (device == null) {
 			device = ge.getDefaultScreenDevice();
 		}
-		window.setLocation(device.getDefaultConfiguration().getBounds().x,
-				window.getY());
+		Rectangle rect = device.getDefaultConfiguration().getBounds();
+		window.setLocation(rect.x, window.getY());
+		window.setSize(rect.width, rect.height);
 		window.toFront();
 	}
 
@@ -370,12 +377,24 @@ public class MainUIFrame {
 			String line;
 			String[] splitArr;
 			Pattern splitPattern = Pattern.compile(Util.dataDivider);
+			final String substitute = Settings.getSubstitute();
+			final String replacement = Settings.getReplacement();
+			final boolean replaceNeeded = substitute != null
+					&& !substitute.isEmpty() && replacement != null
+					&& !replacement.isEmpty();
 			while ((line = br.readLine()) != null) {
 				splitArr = splitPattern.split(line);
 				if (splitArr.length < 3) {
 					continue;
 				}
-				File dir = new File(splitArr[2]);
+
+				String path = splitArr[2];
+				if (replaceNeeded) {
+					path = Util.transformSubst(path).replace(substitute,
+							replacement);
+				}
+				// System.out.println(path);
+				File dir = new File(path);
 				if (!dir.isDirectory()) {
 					continue;
 				}

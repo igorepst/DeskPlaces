@@ -23,6 +23,8 @@ public class Settings {
 	private static final String IMAGE_DIR_SETTING_NAME = "iconsDir";
 	private static final String DEF_FILE_SETTING_NAME = "definitionsFile";
 	private static final String FONT_SETTING_NAME = "font";
+	private static final String SUBST_SETTING_NAME = "substitute";
+	private static final String REPL_SETTING_NAME = "replacement";
 	private static final String PLAYLIST = "$PLAYLIST$";
 
 	public static final int DEFAULT_DISPLAY = 0;
@@ -35,6 +37,8 @@ public class Settings {
 	private static String defFile = "";
 	private static List<String> commands = new ArrayList<String>();
 	private static Font labelFont;
+	private static String substitute;
+	private static String replacement;
 
 	private Settings() {
 	}
@@ -114,6 +118,16 @@ public class Settings {
 				case FONT_SETTING_NAME:
 					Settings.labelFont = Font.decode(value);
 					break;
+				case SUBST_SETTING_NAME:
+					if(!value.isEmpty()){
+						Settings.substitute = Util.transformSubst(value);
+					}
+					break;
+				case REPL_SETTING_NAME:
+					if(!value.isEmpty()){
+						Settings.replacement = Util.transformSubst(value);
+					}
+					break;
 				}
 			}
 		} catch (IOException e) {
@@ -128,7 +142,7 @@ public class Settings {
 			}
 		}
 	}
-
+	
 	private static void parseRunBy(String toParse) {
 		if (toParse.isEmpty()) {
 			return;
@@ -196,6 +210,14 @@ public class Settings {
 
 	public static Font getLabelFont() {
 		return Settings.labelFont;
+	}
+
+	public static String getSubstitute() {
+		return Settings.substitute;
+	}
+
+	public static String getReplacement() {
+		return Settings.replacement;
 	}
 
 }

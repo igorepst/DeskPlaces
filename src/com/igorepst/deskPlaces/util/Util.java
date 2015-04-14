@@ -231,4 +231,8 @@ public class Util {
 		g2.dispose();
 		return resizedImg;
 	}
+
+	public static String transformSubst(final String subst){
+		return subst.toLowerCase(Locale.getDefault()).replace('/', '\\');
+	}
 }
